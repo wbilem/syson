@@ -38,9 +38,11 @@ import org.eclipse.syson.sysml.ConjugatedPortDefinition;
 import org.eclipse.syson.sysml.ConjugatedPortTyping;
 import org.eclipse.syson.sysml.Definition;
 import org.eclipse.syson.sysml.Element;
+import org.eclipse.syson.sysml.EnumerationUsage;
 import org.eclipse.syson.sysml.Expression;
 import org.eclipse.syson.sysml.Feature;
 import org.eclipse.syson.sysml.FeatureChainExpression;
+import org.eclipse.syson.sysml.FeatureDirectionKind;
 import org.eclipse.syson.sysml.FeatureMembership;
 import org.eclipse.syson.sysml.FeatureReferenceExpression;
 import org.eclipse.syson.sysml.FeatureTyping;
@@ -73,6 +75,7 @@ import org.eclipse.syson.sysml.Relationship;
 import org.eclipse.syson.sysml.SelectExpression;
 import org.eclipse.syson.sysml.Subclassification;
 import org.eclipse.syson.sysml.Subsetting;
+import org.eclipse.syson.sysml.SysmlPackage;
 import org.eclipse.syson.sysml.Type;
 import org.eclipse.syson.sysml.Usage;
 import org.eclipse.syson.sysml.VisibilityKind;
@@ -145,7 +148,7 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
             if (content != null && !content.isBlank()) {
                 builder.appendIndentedContent(content);
             }
-        } else {
+        } else if (namespace.eClass() == SysmlPackage.eINSTANCE.getNamespace()) {
             builder.append("namespace ");
             this.appendChildrenContent(builder, namespace, namespace.getOwnedMembership());
         }
@@ -248,9 +251,7 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
         return builder.toString();
     }
 
-    @Override
-    public String caseUsage(Usage usage) {
-        Appender builder = this.newAppender();
+    private String appendDefaultUsage(Appender builder, Usage usage) {
 
         this.appendUsagePrefix(builder, usage);
 
@@ -263,6 +264,24 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
         List<Relationship> children = usage.getOwnedRelationship().stream().filter(IS_DEFINITION_BODY_ITEM_MEMBER).toList();
 
         this.appendChildrenContent(builder, usage, children);
+
+        return builder.toString();
+    }
+
+    @Override
+    public String caseAttributeUsage(AttributeUsage attrUsage) {
+        Appender builder = newAppender();
+
+        appendDefaultUsage(builder, attrUsage);
+
+        return builder.toString();
+    }
+
+    @Override
+    public String caseEnumerationUsage(EnumerationUsage enumUsage) {
+        Appender builder = newAppender();
+
+        appendDefaultUsage(builder, enumUsage);
 
         return builder.toString();
     }
@@ -372,17 +391,18 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
         return this.keywordProvider.doSwitch(usage);
     }
 
-    private void appendFeatureSpecilizationPart(Appender builder, Feature feature) {
-        List<Redefinition> ownedRedefinition = feature.getOwnedRedefinition();
-        this.appendRedefinition(builder, ownedRedefinition, feature);
 
-        this.appendReferenceSubsetting(builder, feature.getOwnedReferenceSubsetting(), feature);
+    private void appendFeatureSpecilizationPart(Appender builder, Feature feature, boolean includeImplied) {
+        List<Redefinition> ownedRedefinition = feature.getOwnedRedefinition();
+        this.appendRedefinition(builder, ownedRedefinition, feature, includeImplied);
+
+        this.appendReferenceSubsetting(builder, feature.getOwnedReferenceSubsetting(), feature, includeImplied);
 
         List<Subsetting> ownedSubsetting = new ArrayList<>(feature.getOwnedSubsetting());
         ownedSubsetting.removeAll(ownedRedefinition);
         ownedSubsetting.remove(feature.getOwnedReferenceSubsetting());
 
-        this.appendSubsettings(builder, ownedSubsetting, feature);
+        this.appendSubsettings(builder, ownedSubsetting.stream().filter(s -> includeImplied || !s.isIsImplied()).toList(), feature);
 
         this.appendFeatureTyping(builder, feature.getOwnedTyping(), feature);
         this.appendMultiplicityPart(builder, feature);
@@ -413,18 +433,20 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
         };
     }
 
-    private void appendRedefinition(Appender builder, List<Redefinition> redefinitions, Element element) {
+    private void appendRedefinition(Appender builder, List<Redefinition> redefinitions, Element element, boolean includeImplied) {
         if (!redefinitions.isEmpty()) {
             builder.appendSpaceIfNeeded().append(LabelConstants.REDEFINITION);
-            builder.appendSpaceIfNeeded().append(redefinitions.stream().map(Redefinition::getRedefinedFeature)
+            builder.appendSpaceIfNeeded().append(redefinitions.stream()
+                    .filter(redef -> includeImplied || !redef.isIsImplied())
+                    .map(Redefinition::getRedefinedFeature)
                     .filter(Objects::nonNull)
                     .map(superFeature -> this.getDeresolvableName(superFeature, element))
                     .collect(Collectors.joining(", ")));
         }
     }
 
-    private void appendReferenceSubsetting(Appender builder, ReferenceSubsetting ownedReferenceSubsetting, Element element) {
-        if (ownedReferenceSubsetting != null) {
+    private void appendReferenceSubsetting(Appender builder, ReferenceSubsetting ownedReferenceSubsetting, Element element, boolean includeImplied) {
+        if (ownedReferenceSubsetting != null && (includeImplied || !ownedReferenceSubsetting.isIsImplied())) {
             builder.appendSpaceIfNeeded().append(LabelConstants.REFERENCES);
             if (ownedReferenceSubsetting.getReferencedFeature() != null) {
                 builder.appendSpaceIfNeeded().append(this.getDeresolvableName(ownedReferenceSubsetting.getReferencedFeature(), element));
@@ -691,7 +713,7 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
     private void appendUsageDeclaration(Appender builder, Usage usage) {
         this.appendNameWithShortName(builder, usage);
 
-        this.appendFeatureSpecilizationPart(builder, usage);
+        this.appendFeatureSpecilizationPart(builder, usage, false);
     }
 
     /**
@@ -727,7 +749,7 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
 
     private void appendUsagePrefix(Appender builder, Usage usage) {
 
-        this.getBasicUsagePrefix(builder, usage);
+        this.appendBasicUsagePrefix(builder, usage);
 
         final String isRef;
         if (usage.isIsReference() && !this.isImplicitlyReferencial(usage)) {
@@ -790,7 +812,12 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
         return builder.toString();
     }
 
-    private void getBasicUsagePrefix(Appender builder, Usage usage) {
+    private void appendBasicUsagePrefix(Appender builder, Usage usage) {
+
+        if (usage.getDirection() != FeatureDirectionKind.IN) {
+            builder.appendWithSpaceIfNeeded(usage.getDirection().toString());
+        }
+
         if (usage.isIsAbstract()) {
             builder.appendSpaceIfNeeded();
             builder.append("abstract");
@@ -951,15 +978,19 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
     public String caseOwningMembership(OwningMembership owningMembership) {
         Appender builder = this.newAppender();
 
-        VisibilityKind visibility = owningMembership.getVisibility();
-        if (visibility != VisibilityKind.PUBLIC) {
-            builder.append(this.getVisivilityIndicator(visibility));
-        }
+        appendMembershipPrefix(owningMembership, builder);
 
         String content = owningMembership.getOwnedRelatedElement().stream().map(rel -> this.doSwitch(rel)).filter(NOT_NULL).collect(joining(builder.getNewLine()));
         builder.appendSpaceIfNeeded().append(content);
 
         return builder.toString();
+    }
+
+    private void appendMembershipPrefix(Membership membership, Appender builder) {
+        VisibilityKind visibility = membership.getVisibility();
+        if (visibility != VisibilityKind.PUBLIC) {
+            builder.append(this.getVisivilityIndicator(visibility));
+        }
     }
 
     private void appendNamespaceImport(Appender builder, NamespaceImport namespaceImport) {
