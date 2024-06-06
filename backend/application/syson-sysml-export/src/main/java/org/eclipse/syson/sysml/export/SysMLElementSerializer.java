@@ -75,6 +75,7 @@ import org.eclipse.syson.sysml.Redefinition;
 import org.eclipse.syson.sysml.ReferenceSubsetting;
 import org.eclipse.syson.sysml.Relationship;
 import org.eclipse.syson.sysml.SelectExpression;
+import org.eclipse.syson.sysml.Specialization;
 import org.eclipse.syson.sysml.Subclassification;
 import org.eclipse.syson.sysml.Subsetting;
 import org.eclipse.syson.sysml.SysmlPackage;
@@ -361,8 +362,63 @@ public class SysMLElementSerializer extends SysmlSwitch<String> {
 
     @Override
     public String caseInvocationExpression(InvocationExpression expression) {
-        LOGGER.warn("InvocationExpression are not handled yet");
-        return "";
+        Appender builder = this.newAppender();
+        List<Relationship> relationships = expression.getOwnedRelationship();
+        if (!relationships.isEmpty() && (relationships.get(0) instanceof FeatureTyping || relationships.get(0) instanceof Subsetting)) {
+            relationships.stream()
+                .filter(Specialization.class::isInstance)
+                .map(Specialization.class::cast)
+                .filter(specialization -> specialization instanceof FeatureTyping || specialization instanceof Subsetting)
+                .findFirst()
+                .ifPresent(specialization -> builder.appendSpaceIfNeeded().append(getDeresolvableName(specialization.getGeneral(), specialization)));
+            appendArgumentList(builder, expression); 
+        } else {
+            LOGGER.warn("FunctionOperationExpression are not handled yet");
+            //appendFunctionOperationExpression(builder, expression);
+        }
+        return builder.toString(); 
+    }
+    
+    private void appendArgumentList(Appender builder, InvocationExpression expression) {
+        builder.append(LabelConstants.OPEN_PARENTHESIS);
+        Relationship relationship = expression.getOwnedRelationship().stream()
+                   .filter(FeatureMembership.class::isInstance)
+                   .map(FeatureMembership.class::cast)
+                   .findFirst()
+                   .orElse(null);
+        if (relationship instanceof ParameterMembership) {
+            appendPositionalArgumentList(builder, expression);
+        }
+        else if (relationship instanceof FeatureMembership) {
+            LOGGER.warn("NamedArgumentList are not handled yet");
+            //appendNamedArgumentList(builder, expression);
+        }
+        builder.append(LabelConstants.CLOSE_PARENTHESIS);
+    }
+    
+    private void appendPositionalArgumentList(Appender builder, InvocationExpression expression) {
+        List<ParameterMembership> parameterMemberships = expression.getOwnedRelationship().stream()
+            .filter(ParameterMembership.class::isInstance)
+            .map(ParameterMembership.class::cast)
+            .filter(param -> {
+                if (param.getOwnedMemberParameter() != null) {
+                    return param.getOwnedMemberParameter().getOwnedRelationship().stream()
+                    .filter(FeatureValue.class::isInstance)
+                    .map(FeatureValue.class::cast)
+                    .findAny().isPresent();
+                }
+                else {
+                    return false;
+                }
+            })
+            .toList();
+
+        for (int i = 0; i < parameterMemberships.size(); i++) {
+            appendArgumentMember(builder, parameterMemberships.get(i));
+            if (i < parameterMemberships.size() - 1) {
+                builder.append(",");
+            }
+        }
     }
 
     @Override

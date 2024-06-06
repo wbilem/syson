@@ -55,6 +55,8 @@ import org.eclipse.syson.sysml.util.ModelBuilder;
 import org.junit.jupiter.api.Test;
 import org.eclipse.syson.sysml.export.models.AttributeUsageWithBracketOperatorExpressionTestModel;
 import org.eclipse.syson.sysml.export.models.AttributeUsageWithFeatureChainExpressionTestModel;
+import org.eclipse.syson.sysml.export.models.AttributeUsageWithInvocationExpressionTestModel;
+import org.eclipse.syson.sysml.export.models.AttributeUsageWithRedefinitionAndFeatureChainExpressionTestModel;
 import org.eclipse.syson.sysml.export.models.AttributeUsageWithSequenceExpressionTestModel;
 import org.eclipse.syson.sysml.export.models.AttributeUsageWithBinaryOperatorExpressionTestModel;
 
@@ -697,6 +699,18 @@ public class SysMLModelToTextSwitchTest {
     public void attributeUsageWithFeatureChainExpression() {
         AttributeUsageWithFeatureChainExpressionTestModel model = new AttributeUsageWithFeatureChainExpressionTestModel();
         this.assertTextualFormEquals("attribute attribute1 = (fuel.mass, front.mass, rear.drives.mass);", model.getAttributeUsage());
+    }
+    
+    @Test
+    public void attributeUsageWithFeatureChainExpressionRedefinition() {
+        AttributeUsageWithRedefinitionAndFeatureChainExpressionTestModel model = new AttributeUsageWithRedefinitionAndFeatureChainExpressionTestModel();
+        this.assertTextualFormEquals("attribute attribute1 = (fuel.mass, front.mass, rear.drives.mass);", model.getAttributeUsage());
+    }
+    
+    @Test
+    public void attributeUsageWithInvocationExpression() {
+        AttributeUsageWithInvocationExpressionTestModel model = new AttributeUsageWithInvocationExpressionTestModel();
+        this.assertTextualFormEquals("attribute attribute1 = fuel(front);", model.getAttributeUsage());
     }
 
     @Test
