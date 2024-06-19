@@ -72,6 +72,7 @@ import org.eclipse.syson.sysml.SysmlFactory;
 import org.eclipse.syson.sysml.UseCaseDefinition;
 import org.eclipse.syson.sysml.VerificationCaseUsage;
 import org.eclipse.syson.sysml.VisibilityKind;
+import org.eclipse.syson.sysml.export.models.AssertConstraintUsageWithOperatorExpressionTestModel;
 import org.eclipse.syson.sysml.export.models.AttributeUsageWithBinaryOperatorExpressionTestModel;
 import org.eclipse.syson.sysml.export.models.AttributeUsageWithBracketOperatorExpressionTestModel;
 import org.eclipse.syson.sysml.export.models.AttributeUsageWithFeatureChainExpressionTestModel;
@@ -79,6 +80,7 @@ import org.eclipse.syson.sysml.export.models.AttributeUsageWithInvocationExpress
 import org.eclipse.syson.sysml.export.models.AttributeUsageWithSequenceExpressionTestModel;
 import org.eclipse.syson.sysml.export.models.sample.CameraModel;
 import org.eclipse.syson.sysml.export.models.sample.PictureTakingModel;
+import org.eclipse.syson.sysml.export.utils.IsImplicitTest;
 import org.eclipse.syson.sysml.export.utils.NameDeresolver;
 import org.eclipse.syson.sysml.export.utils.Severity;
 import org.eclipse.syson.sysml.export.utils.Status;
@@ -757,6 +759,22 @@ public class SysMLElementSerializerTest {
     public void attributeUsageWithInvocationExpression() {
         AttributeUsageWithInvocationExpressionTestModel model = new AttributeUsageWithInvocationExpressionTestModel();
         this.assertTextualFormEquals("attribute attribute1 = fuel(front);", model.getAttributeUsage());
+    }
+    
+    @DisplayName("AssertConstraintUsage containing BinaryOperatorExpression and NullExpression")
+    @Test
+    public void assertConstraintUsageWithOperatorExpression() {
+        AssertConstraintUsageWithOperatorExpressionTestModel model = new AssertConstraintUsageWithOperatorExpressionTestModel();
+        this.assertTextualFormEquals("""
+                assert constraint {
+                    runner != null xor walker != null
+                }""", model.getAssertConstraintUsage());
+    }
+    
+    @Test
+    public void isImplicit() {
+        IsImplicitTest model = new IsImplicitTest();
+        this.assertTextualFormEquals(null, model.getObjectiveMembership());
     }
 
     /**
